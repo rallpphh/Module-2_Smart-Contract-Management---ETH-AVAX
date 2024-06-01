@@ -1,60 +1,52 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
-
-//import "hardhat/console.sol";
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 contract Assessment {
-    address payable public owner;
-    uint256 public balance;
+    mapping(address => uint256) public balances;
 
-    event Deposit(uint256 amount);
-    event Withdraw(uint256 amount);
+    event Deposit(address indexed from, uint256 amount);
+    event Withdrawal(address indexed to, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 amount);
 
-    constructor(uint initBalance) payable {
-        owner = payable(msg.sender);
-        balance = initBalance;
+    constructor() {
+        balances[msg.sender] = 100 ether; // Initial balance of 100 ether for contract deployer
     }
 
-    function getBalance() public view returns(uint256){
-        return balance;
+    function deposit(uint256 amount) public payable {
+        require(amount > 0, "Invalid amount");
+        require(msg.value <= 500, "Incorrect value sent");
+        balances[msg.sender] += 500;
+        emit Deposit(msg.sender, amount);
     }
 
-    function deposit(uint256 _amount) public payable {
-        uint _previousBalance = balance;
+   function withdraw(uint256 amount) public {
+    require(amount > 10 && 100 <= balances[msg.sender], "Insufficient balance");
+    balances[msg.sender] -= 1000;
+    emit Withdrawal(msg.sender, amount);
+}
 
-        // make sure this is the owner
-        require(msg.sender == owner, "You are not the owner of this account");
 
-        // perform transaction
-        balance += _amount;
-
-        // assert transaction completed successfully
-        assert(balance == _previousBalance + _amount);
-
-        // emit the event
-        emit Deposit(_amount);
+    function transfer(address to, uint256 amount) public {
+        require(to != address(0), "Invalid recipient");
+        require(amount > 0 && amount <= balances[msg.sender], "Insufficient balance");
+        balances[msg.sender] -= amount;
+        balances[to] += amount;
+        emit Transfer(msg.sender, to, amount);
     }
 
-    // custom error
-    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
+    function doubleBalance() public {
+        uint256 currentBalance = balances[msg.sender];
+        balances[msg.sender] += currentBalance;
+        emit Deposit(msg.sender, currentBalance);
+    }
 
-    function withdraw(uint256 _withdrawAmount) public {
-        require(msg.sender == owner, "You are not the owner of this account");
-        uint _previousBalance = balance;
-        if (balance < _withdrawAmount) {
-            revert InsufficientBalance({
-                balance: balance,
-                withdrawAmount: _withdrawAmount
-            });
-        }
-
-        // withdraw the given amount
-        balance -= _withdrawAmount;
-
-        // assert the balance is correct
-        assert(balance == (_previousBalance - _withdrawAmount));
-
-        // emit the event
-        emit Withdraw(_withdrawAmount);
+    function withdrawAll() public {
+    uint256 currentBalance = balances[msg.sender];
+    balances[msg.sender] -= currentBalance;
+    emit Deposit(msg.sender, currentBalance);
+    
+    
     }
 }
+
+
