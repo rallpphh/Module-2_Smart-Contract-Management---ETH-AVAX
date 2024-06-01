@@ -17,8 +17,10 @@ export default function HomePage() {
   const [pinWarning, setPinWarning] = useState(false);
   const [timer, setTimer] = useState(0);
   const [hidePin, setHidePin] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [action, setAction] = useState("deposit"); // Default to deposit
 
-  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Update with actual address
+  const contractAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; // Update with actual address
   const atmABI = atm_abi.abi;
 
   useEffect(() => {
@@ -68,15 +70,14 @@ export default function HomePage() {
   const handleTransaction = async (amount, action) => {
     if (atm) {
       try {
-        const tx = action === 'deposit' ? await atm.deposit(amount) : await atm.withdraw(amount);
-        const txResponse = await tx.wait();
-        const transaction = {
-          hash: txResponse.transactionHash,
-          amount: amount,
-          action: action,
+        const tx = action === "deposit" ? await atm.deposit(amount) : await atm.withdraw(amount);
+        await tx.wait();
+        setTransactions(prevTransactions => [...prevTransactions, {
+          hash: tx.hash,
+          amount: parseFloat(amount),
+          action,
           timestamp: new Date().toISOString()
-        };
-        setTransactions((prevTransactions) => [...prevTransactions, transaction]);
+        }]);
         setNotification(`${action} successful.`);
       } catch (error) {
         console.error(`${action} error:`, error);
@@ -84,13 +85,14 @@ export default function HomePage() {
       }
     }
   };
+  
 
-  const deposit = () => {
-    handleTransaction(5000, 'deposit');
+  const deposit = (amount) => {
+    handleTransaction(amount, 'deposit');
   };
 
-  const withdraw = () => {
-    handleTransaction(2500, 'withdraw');
+  const withdraw = (amount) => {
+    handleTransaction(amount, 'withdraw');
   };
 
   const transfer = (amount) => {
@@ -119,15 +121,44 @@ export default function HomePage() {
     }
   };
 
-  const withdrawAll = () => {
+  const withdrawAll = async () => {
     const totalBalance = getTotalBalance();
     if (totalBalance === 0) {
       setNotification("Total Balance is already 0");
     } else {
-      handleTransaction(totalBalance, 'withdraw');
+      try {
+        const tx = await atm.withdraw(totalBalance);
+        await tx.wait();
+        setTransactions([]);
+        setNotification("Withdrawal successful. Transaction history cleared.");
+      } catch (error) {
+        console.error("Withdrawal error:", error);
+        setNotification("Error withdrawing funds. Please try again.");
+      }
     }
   };
-  
+
+  async function SendTransaction(amount) {
+    const param = {
+      from: account,
+      to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      gas: Number(21000).toString(16),
+      gasPrice: Number(2500000).toString(16),
+      value: ethers.utils.parseEther(amount).toHexString(), // Convert ETH to Wei
+    };
+
+    try {
+      await window.ethereum.request({
+        method: "eth_sendTransaction",
+        params: [param],
+      });
+      setNotification("Transaction sent successfully.");
+    } catch (error) {
+      console.error("Error sending transaction:", error);
+      setNotification("Error sending transaction. Please try again.");
+    }
+  }
+
   const getTotalBalance = () => {
     return transactions.reduce((total, transaction) => {
       if (transaction.action === 'deposit') {
@@ -154,6 +185,7 @@ export default function HomePage() {
       setLoggedIn(true);
       setPinAttempts(0); // Reset pin attempts on successful login
       setTransactions([]); // Reset transactions on login
+      handleAccount(); // Connect account after successful login
     } else {
       setPinAttempts(pinAttempts + 1);
       if (pinAttempts >= 2) {
@@ -186,13 +218,21 @@ export default function HomePage() {
     setHidePin((prevHidePin) => !prevHidePin);
   };
 
+  const handleDepositOrWithdraw = () => {
+    if (action === 'deposit') {
+      deposit(parseFloat(amount));
+    } else {
+      withdraw(parseFloat(amount));
+    }
+  };
+
   const initUser = () => {
     if (!ethWallet) {
       return <p>Please install Metamask in order to use this ATM.</p>;
     }
 
     if (!account) {
-      return <button onClick={connectAccount}>Please connect your Bank wallet</button>;
+      return <button onClick={connectAccount}>Connect wallet</button>;
     }
 
     if (!loggedIn) {
@@ -222,14 +262,25 @@ export default function HomePage() {
                 {showAccount ? "👁️" : "👁️‍🗨️"}
               </span>
             </p>
-            <button onClick={deposit}>Deposit 5000</button>
-            <button onClick={withdraw}>Withdraw 2500</button>
+            <div>
+              <select value={action} onChange={(e) => setAction(e.target.value)}>
+                <option value="deposit">Deposit</option>
+                <option value="withdraw">Withdraw</option>
+              </select>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={`${action === 'deposit' ? 'Deposit' : 'Withdraw'} Amount`}
+              />
+              <button onClick={handleDepositOrWithdraw}>{action === 'deposit' ? 'Deposit' : 'Withdraw'}</button>
+              <button onClick={() => SendTransaction(amount)}>Send Transaction</button> {/* Modify here */}
+            </div>
             <button onClick={() => transfer(1000)}>Transfer 1000</button>
             <button onClick={doubleBalance}>Double Balance</button>
             <p>Total Balance: {getTotalBalance()} ETH</p>
             <TransactionHistory transactions={transactions} />
             <button onClick={withdrawAll}>Withdraw All</button>
-
           </>
         )}
       </div>
@@ -266,3 +317,4 @@ const TransactionHistory = ({ transactions }) => {
     </div>
   );
 };
+
