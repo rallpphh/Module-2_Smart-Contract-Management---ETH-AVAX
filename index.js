@@ -18,6 +18,7 @@ export default function HomePage() {
   const [timer, setTimer] = useState(0);
   const [hidePin, setHidePin] = useState(false);
   const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState(""); // New state for recipient address
   const [action, setAction] = useState("deposit"); // Default to deposit
 
   const contractAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"; // Update with actual address
@@ -85,7 +86,6 @@ export default function HomePage() {
       }
     }
   };
-  
 
   const deposit = (amount) => {
     handleTransaction(amount, 'deposit');
@@ -95,16 +95,19 @@ export default function HomePage() {
     handleTransaction(amount, 'withdraw');
   };
 
-  const transfer = (amount) => {
-    // Add a deposit transaction to simulate the balance increase
-    const transaction = {
-      hash: `0x${Math.floor(Math.random() * 1e16).toString(16)}`,
-      amount: amount,
-      action: 'deposit',
-      timestamp: new Date().toISOString()
-    };
-    setTransactions((prevTransactions) => [...prevTransactions, transaction]);
-    setNotification(`Transfer of ${amount} ETH successful.`);
+  const transfer = async (amount, recipient) => {
+    const signer = ethWallet.getSigner();
+    try {
+      const tx = await signer.sendTransaction({
+        to: recipient,
+        value: ethers.utils.parseEther(amount),
+      });
+      await tx.wait();
+      setNotification(`Transfer of ${amount} ETH to ${recipient} successful.`);
+    } catch (error) {
+      console.error("Error transferring ETH:", error);
+      setNotification("Error transferring. Please try again.");
+    }
   };
 
   const doubleBalance = () => {
@@ -137,27 +140,6 @@ export default function HomePage() {
       }
     }
   };
-
-  async function SendTransaction(amount) {
-    const param = {
-      from: account,
-      to: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-      gas: Number(21000).toString(16),
-      gasPrice: Number(2500000).toString(16),
-      value: ethers.utils.parseEther(amount).toHexString(), // Convert ETH to Wei
-    };
-
-    try {
-      await window.ethereum.request({
-        method: "eth_sendTransaction",
-        params: [param],
-      });
-      setNotification("Transaction sent successfully.");
-    } catch (error) {
-      console.error("Error sending transaction:", error);
-      setNotification("Error sending transaction. Please try again.");
-    }
-  }
 
   const getTotalBalance = () => {
     return transactions.reduce((total, transaction) => {
@@ -253,68 +235,117 @@ export default function HomePage() {
       <div>
         <button onClick={handleLogout}>Log Out</button>
         {pinWarning && <p>Please wait {timer} seconds before retrying.</p>}
-        <button onClick={toggleShowDetails}>{showDetails ? "Hide All" : "Show All"}</button>
+        <button onClick={toggleShowDetails}>{showDetails ? "Hide Balance" : "Show Balance"}</button>
         {showDetails && (
-          <>
-            <p>
-              Your Account: {showAccount ? account : "**"}
-              <span onClick={toggleShowAccount} style={{ cursor: "pointer", marginLeft: "10px" }}>
-                {showAccount ? "👁️" : "👁️‍🗨️"}
-              </span>
-            </p>
-            <div>
-              <select value={action} onChange={(e) => setAction(e.target.value)}>
-                <option value="deposit">Deposit</option>
-                <option value="withdraw">Withdraw</option>
-              </select>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={`${action === 'deposit' ? 'Deposit' : 'Withdraw'} Amount`}
-              />
-              <button onClick={handleDepositOrWithdraw}>{action === 'deposit' ? 'Deposit' : 'Withdraw'}</button>
-              <button onClick={() => SendTransaction(amount)}>Send Transaction</button> {/* Modify here */}
-            </div>
-            <button onClick={() => transfer(1000)}>Transfer 1000</button>
-            <button onClick={doubleBalance}>Double Balance</button>
-            <p>Total Balance: {getTotalBalance()} ETH</p>
-            <TransactionHistory transactions={transactions} />
-            <button onClick={withdrawAll}>Withdraw All</button>
-          </>
+          <div>
+            <h1>Balance: {getTotalBalance()} ETH</h1>
+            <h1>{notification}</h1>
+          </div>
         )}
+        <button onClick={toggleShowAccount}>{showAccount ? "Hide Account" : "Show Account"}</button>
+        {showAccount && (
+          <div>
+            <h3>Account: {account}</h3>
+          </div>
+        )}
+        <div>
+          <label>
+            Action:
+            <select value={action} onChange={(e) => setAction(e.target.value)}>
+              <option value="deposit">Deposit</option>
+              <option value="withdraw">Withdraw</option>
+            </select>
+          </label>
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Amount in ETH"
+          />
+          <button onClick={handleDepositOrWithdraw}>
+            {action.charAt(0).toUpperCase() + action.slice(1)}
+          </button>
+        </div>
+        <div>
+          <h3>Transfer Funds</h3>
+          <input
+            type="text"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            placeholder="Recipient Address"
+          />
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="Amount in ETH"
+          />
+          <button onClick={() => transfer(amount, recipient)}>Send Transaction</button>
+        </div>
+        <div>
+          <h3>Transaction History</h3>
+          <ul>
+            {transactions.map((tx, index) => (
+              <li key={index}>
+                {tx.action} {tx.amount} ETH (Hash: {tx.hash})
+              </li>
+            ))}
+          </ul>
+        </div>
+        <button onClick={doubleBalance}>Double Balance</button>
+        <button onClick={withdrawAll}>Withdraw All Funds</button>
       </div>
     );
   };
 
   return (
     <main className="container">
-      <header>
-        <h1 style={{ color: "green" }}>Module 2 Assessment</h1>
-        {initUser()}
-      </header>
-      {notification && <p style={{ color: "red" }}>{notification}</p>}
+      <header> <h1 style={{ color: "green" }}> Module 2 Assessment ATM APP!</h1></header>
+      {initUser()}
       <style jsx>{`
         .container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
           text-align: center;
+          background-color: #f8f9fa;
+          color: #343a40;
+        }
+
+        button {
+          margin: 10px;
+          padding: 10px 20px;
+          background-color: #007bff;
+          color: white;
+          border: none;
+          border-radius: 5px;
+          cursor: pointer;
+        }
+
+        button:hover {
+          background-color: #0056b3;
+        }
+
+        input {
+          margin: 10px;
+          padding: 10px;
+          border: 1px solid #ced4da;
+          border-radius: 5px;
+        }
+
+        select {
+          margin: 10px;
+          padding: 10px;
+          border: 1px solid #ced4da;
+          border-radius: 5px;
+        }
+
+        header {
+          margin-bottom: 20px;
         }
       `}</style>
     </main>
   );
 }
-
-const TransactionHistory = ({ transactions }) => {
-  return (
-    <div>
-      <h2>Transaction History</h2>
-      <ul>
-        {transactions.map((transaction, index) => (
-          <li key={index}>
-            {transaction.timestamp}: {transaction.action} of {transaction.amount} ETH
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
-
