@@ -239,7 +239,7 @@ export default function HomePage() {
         {showDetails && (
           <div>
             <h1>Balance: {getTotalBalance()} ETH</h1>
-            <h1>{notification}</h1>
+            <h1 style={{ color: "red" }}>{notification}</h1>
           </div>
         )}
         <button onClick={toggleShowAccount}>{showAccount ? "Hide Account" : "Show Account"}</button>
@@ -300,7 +300,7 @@ export default function HomePage() {
 
   return (
     <main className="container">
-      <header> <h1 style={{ color: "green" }}> Module 2 Assessment ATM APP!</h1></header>
+       <h1 style={{ color: "green" }}> Module 2 Assessment ATM APP!</h1>
       {initUser()}
       <style jsx>{`
         .container {
